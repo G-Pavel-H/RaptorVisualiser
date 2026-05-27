@@ -33,12 +33,17 @@ Requires Python 3.11+. A working OpenAI API key is needed for any real tree buil
 (RAPTOR uses OpenAI for both embeddings and summarization by default).
 
 ```bash
+git submodule update --init   # fetch the vendored RAPTOR source (one-time)
 cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env       # then edit and paste your OPENAI_API_KEY
+cp .env.example .env          # then edit and paste your OPENAI_API_KEY
 ```
+
+RAPTOR is vendored as a git submodule at `backend/vendor/raptor` because the
+upstream repo has no `setup.py`/`pyproject.toml` and can't be `pip install`-ed
+directly. `backend/app/__init__.py` adds it to `sys.path`.
 
 ### Health check
 
@@ -69,9 +74,10 @@ or an OpenAI key.
 
 ## Known caveats
 
-- **RAPTOR pins old dependency versions** (`numpy==1.26.3`, `transformers==4.38.1`,
-  `openai==1.3.3`). Install in an isolated venv. On Python 3.13 some of these are
-  shaky — Python 3.11 is the safest target.
+- **RAPTOR's upstream requirements pin very old versions** (`numpy==1.26.3`,
+  `transformers==4.38.1`, `openai==1.3.3`) that no longer have wheels for newer
+  Pythons. We've bumped them to mid-2024 versions in `requirements.txt`; if RAPTOR
+  internals break on a bumped lib, fall back to upstream pins on Python 3.11.
 - **`RetrievalAugmentation.add_documents` calls `input()`** if a tree already exists,
   which will hang a server. We'll bypass it in phase 2 by calling
   `tree_builder.build_from_text` directly.

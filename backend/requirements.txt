@@ -9,11 +9,21 @@ sse-starlette==2.1.3
 # Data layer (used from phase 4 onward; pinned now for one-shot installs)
 motor==3.6.0
 
-# RAPTOR + its transitive needs.
-# The library is installed from GitHub. Its own requirements.txt pins old
-# numpy/transformers/openai. We deliberately do NOT mirror those pins here
-# beyond what RAPTOR itself drags in — RAPTOR's pip install will do that.
-raptor @ git+https://github.com/parthsarthi03/raptor.git@main
+# RAPTOR is vendored as a git submodule at backend/vendor/raptor — the upstream
+# repo has no setup.py / pyproject.toml so it can't be `pip install`-ed.
+# Run `git submodule update --init` after cloning. The runtime deps below
+# mirror upstream's own requirements.txt (some pins are old but match what
+# RAPTOR was tested against).
+faiss-cpu>=1.9.0.post1
+numpy>=1.26.4,<2.2
+openai>=1.54.4
+scikit-learn>=1.5.2
+sentence-transformers>=3.3.1
+tenacity>=9.0.0
+tiktoken>=0.8.0
+torch>=2.6.0
+transformers>=4.46.3
+umap-learn>=0.5.7
 
 # Test
 pytest==8.3.3
