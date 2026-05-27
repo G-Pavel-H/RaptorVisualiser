@@ -9,22 +9,38 @@ retrieval queries against it.
 - **DB**: MongoDB Atlas
 - **Streaming**: Server-Sent Events
 
-Build phases (see prompt for details): the repo is being built incrementally. Current
-status: **Phase 1 — backend skeleton complete**.
+Build phases: **Phases 1–7 complete** (everything except the final design polish pass).
+What works today:
+
+- Live build view streams chunk → embed → cluster → summarize → layer-complete events
+  via SSE and animates each node as it arrives.
+- Explore view re-renders the finished tree with click-to-inspect side panel.
+- Query mode hits `/api/builds/{id}/query` with collapsed-tree or tree-traversal
+  retrieval and glows the retrieved nodes.
+- Per-IP daily quota (5 builds), 40 KB input cap, 24 h TTL via Mongo indexes.
 
 ## Repo layout
 
 ```
 backend/
   app/
-    main.py            FastAPI app, /health
+    main.py            FastAPI app + lifespan hooks
+    api.py             /api/builds + SSE stream + query
+    builder.py         EventEmittingBuilder (subclasses ClusterTreeBuilder)
+    build_session.py   per-build asyncio.Queue + thread-safe emit
+    events.py          BuildEvent shape (chunked, embedded, …)
+    db.py              Motor (MongoDB) + per-IP daily quota + TTL
     serialization.py   RAPTOR Tree → JSON
     settings.py        env config
-  scripts/
-    sample_build.py    end-to-end smoke test
-  tests/               pytest unit tests
-  requirements.txt
-  .env.example
+  scripts/sample_build.py
+  tests/               22 pytest tests, all OpenAI/Mongo-free
+  vendor/raptor/       upstream RAPTOR as a git submodule
+frontend/
+  src/app/
+    app.component.ts, app.config.ts, app.routes.ts
+    pages/home, pages/build, pages/explore
+    components/tree-view.component.ts   (D3 layout + animation)
+    services/api.service.ts, services/sse.service.ts
 ```
 
 ## Backend — local run
@@ -66,11 +82,26 @@ the frontend will consume.
 ### Tests
 
 ```bash
-pytest
+pytest          # backend — 22 tests, no OpenAI/Mongo needed
 ```
 
-The serializer is duck-typed against `Node`/`Tree` so its tests run without RAPTOR
-or an OpenAI key.
+All backend tests run without RAPTOR, OpenAI, or Mongo: the serializer is duck-typed,
+the API tests stub `BuildSession.run`, the DB tests stub the Motor collection.
+
+## Frontend — local run
+
+```bash
+cd frontend
+npm install
+npm start                 # serves on http://localhost:4200
+```
+
+The frontend defaults its API base to `http://localhost:8000`. To override at runtime,
+set `window.RAPTOR_API_BASE` in `src/index.html` before bootstrap.
+
+```bash
+npm test                  # karma + jasmine
+```
 
 ## Known caveats
 
