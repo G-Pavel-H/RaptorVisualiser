@@ -44,20 +44,16 @@ interface Laid {
 
     :host ::ng-deep svg { display: block; }
 
-    /* Pulse traveling along edges of the retrieval path */
+    /* Pulse traveling along edges of the retrieval path.
+       Animated via a single d3.timer (rAF loop) — NOT a per-element CSS
+       keyframe — so N pulsing edges = 1 paint cycle, not N. */
     :host ::ng-deep path.edge-pulse {
       fill: none;
       stroke: #b3ff5a;
-      stroke-width: 2.4px;
+      stroke-width: 2.6px;
       stroke-linecap: round;
       stroke-dasharray: 8 16;
-      filter: url(#glow-lime);
-      animation: edge-pulse-flow 1.1s linear infinite;
       pointer-events: none;
-    }
-    @keyframes edge-pulse-flow {
-      from { stroke-dashoffset: 0; }
-      to   { stroke-dashoffset: -24; }
     }
 
     /* Subtle ambient pulse on the selected node */
@@ -96,6 +92,8 @@ export class TreeViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   private gNodes!: d3.Selection<SVGGElement, unknown, null, undefined>;
   private tooltip!: d3.Selection<HTMLDivElement, unknown, null, undefined>;
   private resizeObs?: ResizeObserver;
+  private pulseTimer?: d3.Timer;
+  private hasPulse = false;
 
   ngAfterViewInit(): void {
     this.svg = d3
@@ -194,6 +192,28 @@ export class TreeViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   ngOnDestroy(): void {
     this.resizeObs?.disconnect();
+    this.pulseTimer?.stop();
+  }
+
+  /** Single rAF loop shared across every pulse path. Started lazily; stopped
+   *  when no edges are pulsing so an idle explore view costs nothing. */
+  private ensurePulseLoop(active: boolean): void {
+    if (active === this.hasPulse) return;
+    this.hasPulse = active;
+    this.pulseTimer?.stop();
+    this.pulseTimer = undefined;
+    if (!active) {
+      this.gPulse.selectAll<SVGPathElement, unknown>('path.edge-pulse')
+        .attr('stroke-dashoffset', null);
+      return;
+    }
+    const PERIOD = 1100;   // ms per full dash cycle
+    const CYCLE = 24;      // = stroke-dasharray total
+    this.pulseTimer = d3.timer((elapsed) => {
+      const offset = -((elapsed % PERIOD) / PERIOD) * CYCLE;
+      this.gPulse.selectAll<SVGPathElement, unknown>('path.edge-pulse')
+        .attr('stroke-dashoffset', offset);
+    });
   }
 
   // ----------------------------------------------------------- render
@@ -248,6 +268,8 @@ export class TreeViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       .attr('d', (e) => this.edgePath(byId.get(e.parent)!, byId.get(e.child)!));
 
     pulseSel.exit().remove();
+
+    this.ensurePulseLoop(pulseEdges.length > 0);
 
     // ----- nodes -----
     const nodeSel = this.gNodes
