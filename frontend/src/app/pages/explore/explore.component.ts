@@ -39,7 +39,10 @@ type Method = 'collapsed_tree' | 'tree_traversal';
       </div>
 
       <aside class="panel side">
-        <a class="back muted small" routerLink="/">← new build</a>
+        <a class="new-build-btn" routerLink="/">
+          <span class="plus">+</span>
+          <span>new build</span>
+        </a>
         @if (selectedNode()) {
           <div>
             <div class="badge mono">node {{ selectedNode()!.id }} · layer {{ selectedNode()!.layer }}</div>
@@ -88,7 +91,38 @@ type Method = 'collapsed_tree' | 'tree_traversal';
     .query-input { flex: 1; }
     .tree-area { flex: 1; }
     .side { display: flex; flex-direction: column; gap: 16px; padding: 18px; overflow-y: auto; }
-    .back { display: block; }
+    .new-build-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px 18px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: #04141a;
+      background: linear-gradient(180deg, #6ff5ff 0%, #00e5ff 50%, #00b9d6 100%);
+      border: 1px solid #7dffff;
+      border-radius: var(--radius);
+      box-shadow:
+        0 0 0 1px rgba(125, 255, 255, 0.4) inset,
+        0 0 22px rgba(0, 229, 255, 0.55),
+        0 0 48px rgba(0, 229, 255, 0.25);
+      transition: transform 180ms var(--easing), box-shadow 180ms var(--easing);
+    }
+    .new-build-btn:hover {
+      transform: translateY(-1px) scale(1.015);
+      box-shadow:
+        0 0 0 1px rgba(125, 255, 255, 0.6) inset,
+        0 0 28px rgba(0, 229, 255, 0.75),
+        0 0 64px rgba(0, 229, 255, 0.35);
+    }
+    .new-build-btn .plus {
+      font-size: 20px;
+      line-height: 1;
+      font-weight: 800;
+    }
     .badge {
       display: inline-block;
       padding: 4px 10px;

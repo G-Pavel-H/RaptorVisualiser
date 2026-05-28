@@ -10,6 +10,8 @@ doesn't expose hook points for clustering / per-cluster summarization.
 This means future RAPTOR upstream changes to construct_tree won't be
 picked up automatically — keep this in sync if the submodule is bumped.
 """
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 from typing import Callable, Dict, List
 
 from raptor.cluster_tree_builder import ClusterTreeBuilder
@@ -17,6 +19,10 @@ from raptor.tree_structures import Node
 from raptor.utils import get_node_list, get_text
 
 from . import events
+
+# Max concurrent summary calls per layer. OpenAI's chat-completion endpoint
+# tolerates this easily; raise if your tier allows more.
+SUMMARY_CONCURRENCY = 6
 
 EmitFn = Callable[[events.BuildEvent], None]
 
@@ -32,17 +38,24 @@ class EventEmittingBuilder(ClusterTreeBuilder):
     # ----- leaf chunking + embedding -----
 
     def multithreaded_create_leaf_nodes(self, chunks: List[str]) -> Dict[int, Node]:
-        # Emit one 'chunked' event before any embedding work.
+        # Emit one 'chunked' event before any embedding work, with the chunk ids
+        # pre-allocated. The UI shows N pending placeholders immediately.
         self.emit_fn(events.chunked(chunks))
 
-        # Build leaves sequentially so the emitted node ids match insertion order.
-        # (Threaded version creates them in completion order, which would make
-        # the UI animation look randomized.)
         leaf_nodes: Dict[int, Node] = {}
-        for index, text in enumerate(chunks):
+        lock = Lock()
+
+        def one(index: int, text: str) -> None:
             _, node = self.create_node(index, text)
-            leaf_nodes[index] = node
+            with lock:
+                leaf_nodes[index] = node
             self.emit_fn(events.embedded(index, text))
+
+        with ThreadPoolExecutor(max_workers=SUMMARY_CONCURRENCY) as ex:
+            futures = [ex.submit(one, i, t) for i, t in enumerate(chunks)]
+            for f in as_completed(futures):
+                f.result()
+
         self.emit_fn(events.layer_complete(0, len(leaf_nodes)))
         return leaf_nodes
 
@@ -72,25 +85,38 @@ class EventEmittingBuilder(ClusterTreeBuilder):
                 **self.clustering_params,
             )
 
+            # Pre-allocate node ids deterministically so the UI's notion of
+            # "node 17" matches the final tree regardless of completion order.
+            cluster_jobs = []
             for cluster_idx, cluster in enumerate(clusters):
                 child_ids = [n.index for n in cluster]
                 self.emit_fn(events.cluster_formed(layer + 1, cluster_idx, child_ids))
+                cluster_jobs.append((next_node_index, cluster, child_ids))
+                next_node_index += 1
 
+            lock = Lock()
+
+            def process_one(job):
+                node_id, cluster, child_ids = job
                 node_texts = get_text(cluster)
                 summarized_text = self.summarize(
-                    context=node_texts,
-                    max_tokens=self.summarization_length,
+                    context=node_texts, max_tokens=self.summarization_length
                 )
                 _, new_parent_node = self.create_node(
-                    next_node_index, summarized_text, {n.index for n in cluster}
+                    node_id, summarized_text, {n.index for n in cluster}
                 )
-                new_level_nodes[next_node_index] = new_parent_node
+                with lock:
+                    new_level_nodes[node_id] = new_parent_node
                 self.emit_fn(
                     events.node_summarized(
-                        layer + 1, next_node_index, summarized_text, child_ids
+                        layer + 1, node_id, summarized_text, child_ids
                     )
                 )
-                next_node_index += 1
+
+            with ThreadPoolExecutor(max_workers=SUMMARY_CONCURRENCY) as ex:
+                futures = [ex.submit(process_one, j) for j in cluster_jobs]
+                for f in as_completed(futures):
+                    f.result()  # surface exceptions
 
             layer_to_nodes[layer + 1] = list(new_level_nodes.values())
             current_level_nodes = new_level_nodes

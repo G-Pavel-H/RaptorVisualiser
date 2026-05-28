@@ -132,32 +132,32 @@ export class TreeViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     m2.append('feMergeNode').attr('in', 'b');
     m2.append('feMergeNode').attr('in', 'SourceGraphic');
 
-    // Radial gradient for summary nodes (cyan)
+    // Radial gradient for summary nodes (cyan) — kept saturated all the way out
     const gradCyan = defs
       .append('radialGradient')
       .attr('id', 'grad-cyan')
-      .attr('cx', '50%').attr('cy', '40%').attr('r', '65%');
-    gradCyan.append('stop').attr('offset', '0%').attr('stop-color', '#7dffff');
-    gradCyan.append('stop').attr('offset', '60%').attr('stop-color', '#00e5ff');
-    gradCyan.append('stop').attr('offset', '100%').attr('stop-color', '#007a90');
+      .attr('cx', '50%').attr('cy', '38%').attr('r', '70%');
+    gradCyan.append('stop').attr('offset', '0%').attr('stop-color', '#d0ffff');
+    gradCyan.append('stop').attr('offset', '55%').attr('stop-color', '#22ecff');
+    gradCyan.append('stop').attr('offset', '100%').attr('stop-color', '#00bcd9');
 
-    // Gradient for leaf nodes (slate → blue)
+    // Gradient for leaf nodes (lifted slate → vivid blue)
     const gradLeaf = defs
       .append('radialGradient')
       .attr('id', 'grad-leaf')
-      .attr('cx', '50%').attr('cy', '40%').attr('r', '65%');
-    gradLeaf.append('stop').attr('offset', '0%').attr('stop-color', '#8aa0c2');
-    gradLeaf.append('stop').attr('offset', '70%').attr('stop-color', '#4d6788');
-    gradLeaf.append('stop').attr('offset', '100%').attr('stop-color', '#2a3a52');
+      .attr('cx', '50%').attr('cy', '38%').attr('r', '70%');
+    gradLeaf.append('stop').attr('offset', '0%').attr('stop-color', '#cfe0ff');
+    gradLeaf.append('stop').attr('offset', '60%').attr('stop-color', '#7aa2ff');
+    gradLeaf.append('stop').attr('offset', '100%').attr('stop-color', '#3d6bd6');
 
-    // Gradient for retrieved nodes (lime)
+    // Gradient for retrieved nodes (lime) — bright outer too
     const gradLime = defs
       .append('radialGradient')
       .attr('id', 'grad-lime')
-      .attr('cx', '50%').attr('cy', '40%').attr('r', '65%');
-    gradLime.append('stop').attr('offset', '0%').attr('stop-color', '#e7ff9c');
-    gradLime.append('stop').attr('offset', '60%').attr('stop-color', '#b3ff5a');
-    gradLime.append('stop').attr('offset', '100%').attr('stop-color', '#5a8a1e');
+      .attr('cx', '50%').attr('cy', '38%').attr('r', '70%');
+    gradLime.append('stop').attr('offset', '0%').attr('stop-color', '#f4ffd0');
+    gradLime.append('stop').attr('offset', '55%').attr('stop-color', '#c6ff66');
+    gradLime.append('stop').attr('offset', '100%').attr('stop-color', '#92db2c');
 
     this.gEdges = this.svg.append('g').attr('class', 'edges');
     this.gPulse = this.svg.append('g').attr('class', 'edge-pulses');
@@ -284,12 +284,9 @@ export class TreeViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       .attr('text-anchor', 'middle')
       .attr('dy', '0.34em')
       .style('font-family', '"JetBrains Mono", monospace')
-      .style('font-weight', '700')
+      .style('font-weight', '800')
       .style('pointer-events', 'none')
-      .style('paint-order', 'stroke')
-      .style('stroke', 'rgba(7, 9, 13, 0.85)')
-      .style('stroke-width', '2px')
-      .style('stroke-linejoin', 'round');
+      .style('letter-spacing', '0.02em');
 
     ent
       .transition()
@@ -343,7 +340,7 @@ export class TreeViewComponent implements AfterViewInit, OnChanges, OnDestroy {
       .select<SVGTextElement>('text.label')
       .style('font-size', (d) => `${Math.max(10, Math.min(d.r * 0.72, 18))}px`)
       .style('fill', (d) =>
-        d.data.retrieved ? '#0a1b00' : d.data.pending ? '#a8b0c2' : '#07090d',
+        d.data.retrieved ? '#1a2900' : d.data.pending ? '#e7eaf3' : '#04141a',
       )
       .text((d) => this.labelFor(d));
 
@@ -400,7 +397,9 @@ export class TreeViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   private layout(w: number, h: number): Laid[] {
     if (this.nodes.length === 0) return [];
-    const padding = 60;
+    // Reserve room so the largest possible circle (cap=60) plus its halo (×1.7)
+    // can't ever clip the container edge.
+    const padding = 110;
     const maxLayer = this.nodes.reduce((m, n) => Math.max(m, n.layer), 0);
 
     const byLayer = new Map<number, TVNode[]>();
