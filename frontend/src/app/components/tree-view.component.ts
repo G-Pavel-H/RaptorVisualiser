@@ -64,8 +64,8 @@ interface Laid {
       animation: halo-pulse 1.1s ease-in-out infinite;
     }
     @keyframes halo-pulse {
-      0%, 100% { opacity: 0.18; transform: scale(1); }
-      50%      { opacity: 0.55; transform: scale(1.25); }
+      0%, 100% { opacity: 0.42; transform: scale(1); }
+      50%      { opacity: 0.85; transform: scale(1.28); }
     }
 
     /* Hover lift */
@@ -130,32 +130,18 @@ export class TreeViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     m2.append('feMergeNode').attr('in', 'b');
     m2.append('feMergeNode').attr('in', 'SourceGraphic');
 
-    // Radial gradient for summary nodes (cyan) — kept saturated all the way out
-    const gradCyan = defs
-      .append('radialGradient')
-      .attr('id', 'grad-cyan')
-      .attr('cx', '50%').attr('cy', '38%').attr('r', '70%');
-    gradCyan.append('stop').attr('offset', '0%').attr('stop-color', '#d0ffff');
-    gradCyan.append('stop').attr('offset', '55%').attr('stop-color', '#22ecff');
-    gradCyan.append('stop').attr('offset', '100%').attr('stop-color', '#00bcd9');
-
-    // Gradient for leaf nodes (lifted slate → vivid blue)
-    const gradLeaf = defs
-      .append('radialGradient')
-      .attr('id', 'grad-leaf')
-      .attr('cx', '50%').attr('cy', '38%').attr('r', '70%');
-    gradLeaf.append('stop').attr('offset', '0%').attr('stop-color', '#cfe0ff');
-    gradLeaf.append('stop').attr('offset', '60%').attr('stop-color', '#7aa2ff');
-    gradLeaf.append('stop').attr('offset', '100%').attr('stop-color', '#3d6bd6');
-
-    // Gradient for retrieved nodes (lime) — bright outer too
-    const gradLime = defs
-      .append('radialGradient')
-      .attr('id', 'grad-lime')
-      .attr('cx', '50%').attr('cy', '38%').attr('r', '70%');
-    gradLime.append('stop').attr('offset', '0%').attr('stop-color', '#f4ffd0');
-    gradLime.append('stop').attr('offset', '55%').attr('stop-color', '#c6ff66');
-    gradLime.append('stop').attr('offset', '100%').attr('stop-color', '#92db2c');
+    // Vibrant gradient palette. Each entry produces one radial gradient that
+    // a node can pick by id. All kept fully saturated — no washed-out center,
+    // no muddy outer — so even at small radii the color reads cleanly.
+    for (const g of GRADIENTS) {
+      const grad = defs
+        .append('radialGradient')
+        .attr('id', g.id)
+        .attr('cx', '50%').attr('cy', '36%').attr('r', '72%');
+      grad.append('stop').attr('offset', '0%').attr('stop-color', g.inner);
+      grad.append('stop').attr('offset', '55%').attr('stop-color', g.mid);
+      grad.append('stop').attr('offset', '100%').attr('stop-color', g.outer);
+    }
 
     this.gEdges = this.svg.append('g').attr('class', 'edges');
     this.gPulse = this.svg.append('g').attr('class', 'edge-pulses');
@@ -338,7 +324,7 @@ export class TreeViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         d.data.retrieved ? '#b3ff5a' : d.id === this.selectedId ? '#00e5ff' : '#00e5ff',
       )
       .attr('opacity', (d) =>
-        d.data.retrieved ? 0.4 : d.id === this.selectedId ? 0.35 : 0,
+        d.data.retrieved ? 0.65 : d.id === this.selectedId ? 0.55 : 0,
       );
 
     merged
@@ -484,16 +470,52 @@ export class TreeViewComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private fill(d: TVNode, _selected: boolean): string {
-    if (d.retrieved) return 'url(#grad-lime)';
-    if (d.pending) return '#1f2632';
-    return d.layer === 0 ? 'url(#grad-leaf)' : 'url(#grad-cyan)';
+    return gradientFor(d);
   }
 
   private stroke(d: TVNode, selected: boolean): string {
     if (d.retrieved) return '#eaffce';
     if (selected) return '#ffffff';
-    return d.pending ? '#ff3df0' : 'rgba(255, 255, 255, 0.18)';
+    if (d.pending) return '#ff7df0';
+    return 'rgba(255, 255, 255, 0.55)';   // crisp light ring on every node
   }
+}
+
+// ---- gradient palette ----
+
+interface GradientDef { id: string; inner: string; mid: string; outer: string; }
+
+const GRADIENTS: GradientDef[] = [
+  { id: 'grad-cyan',    inner: '#c8ffff', mid: '#22ecff', outer: '#00a8c8' },
+  { id: 'grad-azure',   inner: '#cfe4ff', mid: '#5aa3ff', outer: '#2563eb' },
+  { id: 'grad-violet',  inner: '#e5d2ff', mid: '#a479ff', outer: '#5b1fb5' },
+  { id: 'grad-magenta', inner: '#ffd0f4', mid: '#ff6ad8', outer: '#c41eb5' },
+  { id: 'grad-amber',   inner: '#ffe9b8', mid: '#ffb547', outer: '#d97706' },
+  { id: 'grad-coral',   inner: '#ffd4c2', mid: '#ff8567', outer: '#d63c1a' },
+];
+
+// Special-case fills (overrides palette when condition matches)
+const GRAD_RETRIEVED = 'grad-retrieved';
+const GRAD_PENDING = 'grad-pending';
+
+GRADIENTS.push(
+  { id: GRAD_RETRIEVED, inner: '#f4ffd0', mid: '#c6ff66', outer: '#7ec61e' },
+  { id: GRAD_PENDING,   inner: '#52617a', mid: '#384660', outer: '#1e2738' },
+);
+
+function gradientFor(d: TVNode): string {
+  if (d.retrieved) return `url(#${GRAD_RETRIEVED})`;
+  if (d.pending) return `url(#${GRAD_PENDING})`;
+  // Layer 0 sticks to cyan/azure family; higher layers cycle through the
+  // vivid palette so summaries are visually distinguishable from leaves
+  // and from each other.
+  if (d.layer === 0) {
+    const blueish = ['grad-cyan', 'grad-azure'];
+    return `url(#${blueish[d.id % blueish.length]})`;
+  }
+  // 6-color palette (excluding the two override gradients pushed above)
+  const palette = ['grad-violet', 'grad-magenta', 'grad-amber', 'grad-coral', 'grad-cyan', 'grad-azure'];
+  return `url(#${palette[(d.layer * 7 + d.id) % palette.length]})`;
 }
 
 // ---- small helpers ----
