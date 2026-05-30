@@ -18,6 +18,16 @@ const SAMPLE = `The Apollo program was a series of human spaceflight missions un
           to your browser. Click any node when it's done. Ask questions and see exactly which nodes
           get retrieved.
         </p>
+        <div class="meta-links">
+          <a class="meta-link" href="https://arxiv.org/html/2401.18059v1" target="_blank" rel="noopener">
+            <span class="meta-icon">📄</span>
+            <span>What is RAPTOR? <span class="dim">— read the paper</span></span>
+          </a>
+          <a class="meta-link" href="https://www.linkedin.com/in/pavel-ghazaryan/" target="_blank" rel="noopener">
+            <span class="meta-icon">in</span>
+            <span>Built by <span class="accent">Pavel Ghazaryan</span> <span class="dim">— say hi on LinkedIn</span></span>
+          </a>
+        </div>
       </section>
 
       <section class="panel input-card">
@@ -90,7 +100,39 @@ const SAMPLE = `The Apollo program was a series of human spaceflight missions un
       color: var(--accent);
       text-shadow: 0 0 24px var(--accent-glow);
     }
-    .hero p { font-size: 16px; line-height: 1.65; margin: 0 0 40px; max-width: 640px; }
+    .hero p { font-size: 16px; line-height: 1.65; margin: 0 0 22px; max-width: 640px; }
+    .meta-links { display: flex; flex-direction: column; gap: 8px; margin: 0 0 40px; }
+    .meta-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: rgba(15, 19, 28, 0.5);
+      color: var(--text-1);
+      font-size: 13.5px;
+      width: fit-content;
+      transition: border-color 180ms var(--easing), color 180ms var(--easing), box-shadow 180ms var(--easing);
+    }
+    .meta-link:hover {
+      border-color: var(--accent);
+      color: var(--text-0);
+      box-shadow: 0 0 14px rgba(0, 229, 255, 0.25);
+    }
+    .meta-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11px;
+      font-weight: 700;
+    }
     .input-card { padding: 24px; }
     .label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-2); margin-bottom: 8px; }
     textarea {
