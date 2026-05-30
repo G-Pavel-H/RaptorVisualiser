@@ -81,6 +81,13 @@ input, textarea, select {
   font-size: 14px;
   transition: border-color 200ms var(--easing), box-shadow 200ms var(--easing);
 }
+/* iOS Safari auto-zooms when a focused input's font-size is below 16px.
+   Lift it on mobile only so the desktop type scale is unchanged. */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px;
+  }
+}
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: var(--accent);
