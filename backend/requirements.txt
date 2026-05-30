@@ -14,15 +14,17 @@ motor==3.6.0
 # Run `git submodule update --init` after cloning. The runtime deps below
 # mirror upstream's own requirements.txt (some pins are old but match what
 # RAPTOR was tested against).
+# RAPTOR's runtime deps. `torch`, `transformers`, `sentence-transformers` are
+# imported at the top of RAPTOR's QAModels.py and EmbeddingModels.py for
+# classes we never use (we wrote our own OpenAI-based wrappers). They are
+# stubbed in app/__init__.py so the imports succeed without the packages.
+# Skipping them saves ~2 GB of install on Render's free tier.
 faiss-cpu>=1.9.0.post1
 numpy>=1.26.4,<2.2
 openai>=1.54.4
 scikit-learn>=1.5.2
-sentence-transformers>=3.3.1
 tenacity>=9.0.0
 tiktoken>=0.8.0
-torch>=2.6.0
-transformers>=4.46.3
 umap-learn>=0.5.7
 
 # Test
