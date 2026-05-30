@@ -1,10 +1,12 @@
 import asyncio
 import logging
 import os
+from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from . import cost_tracker
 
@@ -76,6 +78,50 @@ def create_app() -> FastAPI:
             "status": "ok",
             "openai_key_configured": bool(settings.openai_api_key),
         }
+
+    # ---------- Angular static hosting ----------
+    # The frontend build (`ng build`) produces `frontend/dist/raptor-visualizer/browser/`.
+    # If that directory exists (i.e. we're running in production after the
+    # combined build), serve it as the site root. /api/* routes still win
+    # because they're registered above and StaticFiles only handles unmatched
+    # paths.
+    frontend_dist = (
+        Path(__file__).resolve().parent.parent.parent
+        / "frontend" / "dist" / "raptor-visualizer" / "browser"
+    )
+    if frontend_dist.is_dir():
+        # Mount static assets at /.  `html=True` makes it serve index.html
+        # for the root request automatically.
+        app.mount(
+            "/static-assets",
+            StaticFiles(directory=frontend_dist),
+            name="static-assets",
+        )
+
+        index_file = frontend_dist / "index.html"
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa_fallback(full_path: str):
+            """Serve a real file if it exists, else fall back to index.html
+            so Angular's client-side routing can handle deep links."""
+            # /api/* should have been handled by the router already; if we
+            # got here for /api/* it's a genuine 404.
+            if full_path.startswith("api/"):
+                raise HTTPException(status_code=404, detail="Not found.")
+            candidate = frontend_dist / full_path
+            if full_path and candidate.is_file():
+                return FileResponse(candidate)
+            return FileResponse(index_file)
+    else:
+        # Backend running solo (local dev without `ng build`). Give a friendly
+        # JSON at / instead of FastAPI's default 404.
+        @app.get("/")
+        def root() -> dict:
+            return {
+                "service": "raptor-live-api",
+                "status": "ok",
+                "note": "frontend not built — run `ng build` to bundle UI here",
+            }
 
     return app
 
