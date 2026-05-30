@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="cy" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#d0ffff"/>
+      <stop offset="55%" stop-color="#22ecff"/>
+      <stop offset="100%" stop-color="#00a8c8"/>
+    </radialGradient>
+    <radialGradient id="bl" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#cfe4ff"/>
+      <stop offset="60%" stop-color="#7aa2ff"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </radialGradient>
+    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#131b29"/>
+      <stop offset="100%" stop-color="#07090d"/>
+    </radialGradient>
+  </defs>
+
+  <!-- rounded dark square -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+
+  <!-- edges -->
+  <g stroke="#3a4763" stroke-width="2" fill="none" stroke-linecap="round">
+    <path d="M32 20 C 32 28, 18 30, 18 42"/>
+    <path d="M32 20 C 32 28, 32 32, 32 42"/>
+    <path d="M32 20 C 32 28, 46 30, 46 42"/>
+  </g>
+
+  <!-- summary node -->
+  <circle cx="32" cy="18" r="9" fill="url(#cy)" stroke="rgba(255,255,255,0.55)" stroke-width="1.2"/>
+
+  <!-- leaf nodes -->
+  <circle cx="18" cy="46" r="6" fill="url(#bl)" stroke="rgba(255,255,255,0.45)" stroke-width="1"/>
+  <circle cx="32" cy="46" r="6" fill="url(#bl)" stroke="rgba(255,255,255,0.45)" stroke-width="1"/>
+  <circle cx="46" cy="46" r="6" fill="url(#bl)" stroke="rgba(255,255,255,0.45)" stroke-width="1"/>
+</svg>
