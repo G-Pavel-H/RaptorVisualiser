@@ -24,9 +24,13 @@ def create_app() -> FastAPI:
         os.environ["OPENAI_API_KEY"] = settings.openai_api_key
     app = FastAPI(title="RAPTOR Live Visualizer", version="0.1.0")
 
+    # Allow the configured production origin AND any preview deploy under
+    # *.vercel.app — Vercel rotates hashed URLs every push, so an exact
+    # allowlist would break every redeploy.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_origin],
+        allow_origin_regex=r"https://.*\.vercel\.app",
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -37,15 +41,24 @@ def create_app() -> FastAPI:
     # sits OUTSIDE our CORSMiddleware — so responses from it don't get CORS
     # headers automatically. Add them by hand or the browser will blame CORS
     # for every server error.
+    import re
     allowed_origin = settings.frontend_origin
+    vercel_re = re.compile(r"^https://.*\.vercel\.app$")
+
+    def _origin_allowed(origin: str | None) -> bool:
+        if not origin:
+            return False
+        if allowed_origin == "*" or origin == allowed_origin:
+            return True
+        return bool(vercel_re.match(origin))
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
         logger.exception("Unhandled error on %s %s", request.method, request.url.path)
         origin = request.headers.get("origin")
         headers: dict[str, str] = {}
-        if origin and (allowed_origin == "*" or origin == allowed_origin):
-            headers["access-control-allow-origin"] = origin
+        if _origin_allowed(origin):
+            headers["access-control-allow-origin"] = origin or ""
             headers["access-control-allow-credentials"] = "true"
             headers["vary"] = "Origin"
         return JSONResponse(
