@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 // In `ng serve` dev mode → call the local FastAPI on :8000.
 // In production (Vercel) → call the deployed Render backend.
 // Override either by setting `window.RAPTOR_API_BASE` in index.html.
-const PROD_API = 'https://raptorvisualiser.onrender.com.onrender.com';
+const PROD_API = 'https://raptorvisualiser.onrender.com';
 const isLocalDev =
   typeof window !== 'undefined' && window.location.hostname === 'localhost';
 const API_BASE =
