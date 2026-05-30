@@ -84,6 +84,11 @@ class BuildSession:
         embedding_model = TrackingEmbeddingModel(self._recorder)
         summarization_model = TrackingSummarizationModel(self._recorder)
         qa_model = TrackingQAModel(self._recorder)
+        # When `embedding_model` is supplied, RAPTOR keys node embeddings
+        # under "EMB" instead of "OpenAI". Stash both so the query endpoint
+        # can rebuild a TreeRetrieverConfig pointed at the right key.
+        self._embedding_model = embedding_model
+        self._embedding_key = "EMB"
 
         cfg = RetrievalAugmentationConfig(
             tb_max_tokens=40,
@@ -156,6 +161,14 @@ class BuildSession:
     @property
     def qa_model(self):
         return getattr(self, "_qa_model", None)
+
+    @property
+    def embedding_model(self):
+        return getattr(self, "_embedding_model", None)
+
+    @property
+    def embedding_key(self) -> str:
+        return getattr(self, "_embedding_key", "OpenAI")
 
 
 class BuildRegistry:

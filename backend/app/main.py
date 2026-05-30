@@ -1,11 +1,14 @@
+import asyncio
+import logging
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-
-import asyncio
+from fastapi.responses import JSONResponse
 
 from . import cost_tracker
+
+logger = logging.getLogger(__name__)
 from .api import router as api_router
 from .db import ensure_indexes
 from .settings import get_settings
@@ -27,6 +30,33 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router)
+
+    # `Exception` handlers run inside starlette's ServerErrorMiddleware which
+    # sits OUTSIDE our CORSMiddleware — so responses from it don't get CORS
+    # headers automatically. Add them by hand or the browser will blame CORS
+    # for every server error.
+    allowed_origin = settings.frontend_origin
+
+    @app.exception_handler(Exception)
+    async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        origin = request.headers.get("origin")
+        headers: dict[str, str] = {}
+        if origin and (allowed_origin == "*" or origin == allowed_origin):
+            headers["access-control-allow-origin"] = origin
+            headers["access-control-allow-credentials"] = "true"
+            headers["vary"] = "Origin"
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": {
+                    "kind": "generic",
+                    "message": "Internal server error.",
+                    "error": exc.__class__.__name__,
+                }
+            },
+            headers=headers,
+        )
 
     @app.on_event("startup")
     async def _startup() -> None:

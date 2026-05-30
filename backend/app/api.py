@@ -162,7 +162,13 @@ async def query_build(build_id: str, body: QueryBody, request: Request) -> Dict[
     from raptor.tree_retriever import TreeRetrieverConfig
 
     collapse = body.method == "collapsed_tree"
-    retriever = TreeRetriever(TreeRetrieverConfig(), session.tree)
+    # The session's embedding model is the same instance the build used, so
+    # the retriever embeds the query under the same key the nodes used.
+    retriever_kwargs: Dict[str, Any] = {}
+    if session.embedding_model is not None:
+        retriever_kwargs["embedding_model"] = session.embedding_model
+        retriever_kwargs["context_embedding_model"] = session.embedding_key
+    retriever = TreeRetriever(TreeRetrieverConfig(**retriever_kwargs), session.tree)
     try:
         context, layer_info = await asyncio.to_thread(
             retriever.retrieve,
