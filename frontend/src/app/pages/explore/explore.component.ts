@@ -91,6 +91,15 @@ type Method = 'collapsed_tree' | 'tree_traversal';
       padding: 16px;
       height: calc(100vh - 60px);
     }
+    @media (max-width: 768px) {
+      .explore-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: 45vh 1fr;
+        height: calc(100dvh - 60px);
+        padding: 10px;
+        gap: 10px;
+      }
+    }
     .canvas {
       display: flex;
       flex-direction: column;
@@ -108,7 +117,7 @@ type Method = 'collapsed_tree' | 'tree_traversal';
     }
     .query-input { flex: 1; }
     .tree-area { flex: 1; }
-    .side { display: flex; flex-direction: column; gap: 16px; padding: 18px; overflow-y: auto; }
+    .side { display: flex; flex-direction: column; gap: 16px; padding: 18px; overflow-y: auto; min-height: 0; }
     .new-build-btn {
       display: flex;
       align-items: center;

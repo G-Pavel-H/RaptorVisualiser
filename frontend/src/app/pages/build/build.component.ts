@@ -76,6 +76,19 @@ import { TVEdge, TVNode, TreeViewComponent } from '../../components/tree-view.co
       padding: 16px;
       height: calc(100vh - 60px);
     }
+    /* Phones: stack canvas + side panel vertically so the side panel
+       reaches the bottom of the viewport instead of leaving dead space. */
+    @media (max-width: 768px) {
+      .build-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: 45vh 1fr;
+        /* Use dvh where supported so the iOS Safari address-bar collapse
+           doesn't leave a gap under the panel. */
+        height: calc(100dvh - 60px);
+        padding: 10px;
+        gap: 10px;
+      }
+    }
     .canvas {
       background: var(--bg-1);
       border: 1px solid var(--border);
@@ -88,6 +101,8 @@ import { TVEdge, TVNode, TreeViewComponent } from '../../components/tree-view.co
       flex-direction: column;
       padding: 18px;
       gap: 16px;
+      min-height: 0;          /* allow inner .log to flex-shrink */
+      overflow: hidden;
     }
     .header { display: flex; align-items: center; gap: 12px; }
     .status-dot {
@@ -117,7 +132,8 @@ import { TVEdge, TVNode, TreeViewComponent } from '../../components/tree-view.co
     }
     .counter-label { font-size: 10px; text-transform: uppercase; color: var(--text-2); letter-spacing: 0.1em; }
     .log {
-      flex: 1;
+      flex: 1 1 0;
+      min-height: 0;
       overflow-y: auto;
       font-size: 11px;
       line-height: 1.6;
@@ -126,7 +142,6 @@ import { TVEdge, TVNode, TreeViewComponent } from '../../components/tree-view.co
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 10px;
-      max-height: 320px;
     }
     .log-line.embedded { color: var(--text-1); }
     .log-line.cluster_formed { color: var(--magenta); }
