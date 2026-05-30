@@ -1,10 +1,12 @@
 """MongoDB Atlas integration via Motor.
 
-Two collections:
-- builds: { _id, status, text_preview, tree_json, created_at, owner_session_id, ip }
-- usage:  { _id, ip, date, count }   (composite index on ip+date)
+Collections:
+- builds          {_id, status, text_preview, tree_json, created_at, ip}
+- spend_log       {_id: 'YYYY-MM-DD', cost_usd, prompt_tokens, completion_tokens, updated_at}
+- spend_log_ip    {_id: 'YYYY-MM-DD::<ip>', date, ip, cost_usd, prompt_tokens, completion_tokens}
 
-Trees auto-expire 24h after creation via a TTL index on `created_at`.
+`builds` expires after 24h via TTL. Spend logs expire after 30 days so we can
+glance at recent traffic without growing unbounded.
 """
 from __future__ import annotations
 
@@ -16,8 +18,8 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from .settings import get_settings
 
-TTL_SECONDS = 24 * 60 * 60
-DAILY_BUILD_LIMIT = 50000
+TTL_BUILDS_SECONDS = 24 * 60 * 60
+TTL_SPEND_SECONDS = 30 * 24 * 60 * 60
 
 
 @lru_cache
@@ -33,38 +35,10 @@ async def ensure_indexes() -> None:
     db = get_db()
     if db is None:
         return
-    await db.builds.create_index("created_at", expireAfterSeconds=TTL_SECONDS)
-    await db.usage.create_index([("ip", 1), ("date", 1)], unique=True)
-
-
-def _today() -> str:
-    return dt.date.today().isoformat()
-
-
-async def check_and_increment_quota(ip: str) -> Dict[str, int]:
-    """Atomically increment today's count for `ip`.
-
-    Returns {used, remaining}. Raises QuotaExceeded if over limit.
-    """
-    db = get_db()
-    if db is None:
-        # No DB configured — skip rate limiting (local dev).
-        return {"used": 0, "remaining": DAILY_BUILD_LIMIT}
-
-    doc = await db.usage.find_one_and_update(
-        {"ip": ip, "date": _today()},
-        {"$inc": {"count": 1}},
-        upsert=True,
-        return_document=True,
-    )
-    used = doc["count"]
-    if used > DAILY_BUILD_LIMIT:
-        # Roll back the increment so the user can retry tomorrow.
-        await db.usage.update_one(
-            {"ip": ip, "date": _today()}, {"$inc": {"count": -1}}
-        )
-        raise QuotaExceeded(used=DAILY_BUILD_LIMIT, remaining=0)
-    return {"used": used, "remaining": DAILY_BUILD_LIMIT - used}
+    await db.builds.create_index("created_at", expireAfterSeconds=TTL_BUILDS_SECONDS)
+    await db.spend_log.create_index("updated_at", expireAfterSeconds=TTL_SPEND_SECONDS)
+    await db.spend_log_ip.create_index("updated_at", expireAfterSeconds=TTL_SPEND_SECONDS)
+    await db.spend_log_ip.create_index([("date", 1), ("ip", 1)])
 
 
 async def save_build(
@@ -74,7 +48,6 @@ async def save_build(
     status: str,
     tree_json: Optional[Dict[str, Any]],
     ip: str,
-    owner_session_id: Optional[str] = None,
 ) -> None:
     db = get_db()
     if db is None:
@@ -87,9 +60,8 @@ async def save_build(
                 "text_preview": text[:300],
                 "tree_json": tree_json,
                 "ip": ip,
-                "owner_session_id": owner_session_id,
             },
-            "$setOnInsert": {"created_at": dt.datetime.utcnow()},
+            "$setOnInsert": {"created_at": dt.datetime.now(dt.timezone.utc)},
         },
         upsert=True,
     )
@@ -100,10 +72,3 @@ async def load_build(build_id: str) -> Optional[Dict[str, Any]]:
     if db is None:
         return None
     return await db.builds.find_one({"_id": build_id})
-
-
-class QuotaExceeded(Exception):
-    def __init__(self, *, used: int, remaining: int) -> None:
-        super().__init__(f"daily build limit reached ({used}/{used})")
-        self.used = used
-        self.remaining = remaining

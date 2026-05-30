@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { ApiService, SerializedTree } from '../../services/api.service';
+import { ApiErrorDetail, ApiService, ErrorKind, SerializedTree } from '../../services/api.service';
 import { TVEdge, TVNode, TreeViewComponent } from '../../components/tree-view.component';
 
 type Method = 'collapsed_tree' | 'tree_traversal';
@@ -50,6 +50,24 @@ type Method = 'collapsed_tree' | 'tree_traversal';
           </div>
         } @else {
           <div class="muted small">click any node to see its full text.</div>
+        }
+
+        @if (queryError()) {
+          @if (queryError()!.kind === 'out_of_funds') {
+            <div class="section error-card funds">
+              <div class="title">🪙 The AI piggy bank ran dry</div>
+              <div class="body">Pavel's been pinged. Try again in a minute.</div>
+            </div>
+          } @else if (queryError()!.kind === 'site_cap' || queryError()!.kind === 'ip_cap') {
+            <div class="section error-card cap">
+              <div class="title">⏳ Daily budget reached</div>
+              <div class="body">{{ queryError()!.message }}</div>
+            </div>
+          } @else {
+            <div class="section error-card">
+              <div class="body">{{ queryError()!.message }}</div>
+            </div>
+          }
         }
 
         @if (lastContext()) {
@@ -159,6 +177,24 @@ type Method = 'collapsed_tree' | 'tree_traversal';
     }
     .retrieved { margin-top: 8px; }
     .small { font-size: 11px; }
+    .error-card {
+      background: rgba(255, 89, 112, 0.08);
+      border: 1px solid rgba(255, 89, 112, 0.35);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+    }
+    .error-card .title { font-weight: 700; font-size: 14px; color: var(--text-0); margin-bottom: 4px; }
+    .error-card .body { font-size: 12.5px; color: var(--text-1); line-height: 1.55; }
+    .error-card.funds {
+      background: linear-gradient(180deg, rgba(255, 213, 47, 0.10), rgba(255, 213, 47, 0.03));
+      border-color: rgba(255, 213, 47, 0.5);
+    }
+    .error-card.funds .title { color: #ffd54f; }
+    .error-card.cap {
+      background: rgba(0, 229, 255, 0.06);
+      border-color: rgba(0, 229, 255, 0.45);
+    }
+    .error-card.cap .title { color: var(--accent); }
   `],
 })
 export class ExploreComponent implements OnInit {
@@ -174,6 +210,7 @@ export class ExploreComponent implements OnInit {
   querying = signal(false);
   retrievedIds = signal<number[]>([]);
   lastContext = signal<string | null>(null);
+  queryError = signal<{ kind: ErrorKind; message: string } | null>(null);
 
   selectedNode = computed(() => {
     const id = this.selectedId();
@@ -202,6 +239,7 @@ export class ExploreComponent implements OnInit {
 
   runQuery() {
     if (!this.query().trim()) return;
+    this.queryError.set(null);
     this.querying.set(true);
     this.api.query(this.buildId(), this.query(), this.method()).subscribe({
       next: (r) => {
@@ -209,7 +247,15 @@ export class ExploreComponent implements OnInit {
         this.lastContext.set(r.context ?? '');
         this.querying.set(false);
       },
-      error: () => this.querying.set(false),
+      error: (err) => {
+        this.querying.set(false);
+        const detail: ApiErrorDetail | string | undefined = err?.error?.detail;
+        if (detail && typeof detail === 'object') {
+          this.queryError.set({ kind: detail.kind, message: detail.message });
+        } else {
+          this.queryError.set({ kind: 'generic', message: typeof detail === 'string' ? detail : 'Query failed.' });
+        }
+      },
     });
   }
 }

@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { ApiService } from '../../services/api.service';
+import { ApiService, ErrorKind } from '../../services/api.service';
 import { BuildEvent, SseService } from '../../services/sse.service';
 import { TVEdge, TVNode, TreeViewComponent } from '../../components/tree-view.component';
 
@@ -49,7 +49,20 @@ import { TVEdge, TVNode, TreeViewComponent } from '../../components/tree-view.co
         @if (status() === 'done') {
           <a class="explore-btn" [routerLink]="['/builds', buildId(), 'explore']">explore tree →</a>
         }
-        @if (status() === 'error') {
+        @if (status() === 'error' && errorKind() === 'out_of_funds') {
+          <div class="error funds">
+            <div class="title">🪙 The AI piggy bank ran dry</div>
+            <div class="body">
+              We got partway through your tree before the budget ran out. You can still
+              explore what we built.
+            </div>
+            @if (nodes().length > 0) {
+              <a class="explore-btn small-btn" [routerLink]="['/builds', buildId(), 'explore']">
+                explore partial tree →
+              </a>
+            }
+          </div>
+        } @else if (status() === 'error') {
           <div class="error mono small">{{ errorMsg() }}</div>
         }
       </aside>
@@ -133,9 +146,16 @@ import { TVEdge, TVNode, TreeViewComponent } from '../../components/tree-view.co
       color: var(--danger);
       background: rgba(255, 89, 112, 0.08);
       border: 1px solid rgba(255, 89, 112, 0.35);
-      padding: 10px;
+      padding: 12px 14px;
       border-radius: var(--radius);
     }
+    .error.funds {
+      background: linear-gradient(180deg, rgba(255, 213, 47, 0.10), rgba(255, 213, 47, 0.03));
+      border-color: rgba(255, 213, 47, 0.5);
+    }
+    .error.funds .title { color: #ffd54f; font-weight: 700; margin-bottom: 4px; }
+    .error.funds .body { color: var(--text-1); font-size: 13px; line-height: 1.55; margin-bottom: 10px; }
+    .small-btn { padding: 8px 12px; font-size: 13px; }
   `],
 })
 export class BuildComponent implements OnInit, OnDestroy {
@@ -148,6 +168,7 @@ export class BuildComponent implements OnInit, OnDestroy {
   status = signal<'pending' | 'running' | 'done' | 'error'>('pending');
   stage = signal<string | null>(null);
   errorMsg = signal<string | null>(null);
+  errorKind = signal<ErrorKind | null>(null);
   chunkCount = signal(0);
   clusterCount = signal(0);
   layerProgress = signal('0/0');
@@ -227,6 +248,7 @@ export class BuildComponent implements OnInit, OnDestroy {
       case 'error': {
         this.status.set('error');
         this.errorMsg.set(e.payload.message);
+        this.errorKind.set((e.payload.kind ?? 'generic') as ErrorKind);
         append(`error: ${e.payload.message}`);
         break;
       }

@@ -79,5 +79,11 @@ def done(tree_json: Dict[str, Any]) -> BuildEvent:
     return BuildEvent(stage="done", payload={"tree": tree_json})
 
 
-def error(message: str) -> BuildEvent:
-    return BuildEvent(stage="error", payload={"message": message})
+def error(message: str, kind: str = "generic") -> BuildEvent:
+    """Stage 'error'. `kind` discriminates UX:
+       - 'generic'        any uncaught build failure
+       - 'out_of_funds'   OpenAI returned insufficient_quota mid-build
+       - 'site_cap'       global daily spend cap reached
+       - 'ip_cap'         this IP's daily spend cap reached
+    """
+    return BuildEvent(stage="error", payload={"message": message, "kind": kind})

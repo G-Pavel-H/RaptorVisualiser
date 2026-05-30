@@ -3,6 +3,9 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+import asyncio
+
+from . import cost_tracker
 from .api import router as api_router
 from .db import ensure_indexes
 from .settings import get_settings
@@ -27,6 +30,9 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def _startup() -> None:
+        # Capture the running loop so worker threads can schedule async DB
+        # writes (used by cost_tracker.record_usage_threadsafe).
+        cost_tracker.bind_loop(asyncio.get_running_loop())
         try:
             await ensure_indexes()
         except Exception as exc:  # noqa: BLE001

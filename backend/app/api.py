@@ -8,13 +8,12 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from . import db, events
-from .build_session import BuildSession, registry
+from . import cost_tracker, db, events
+from .build_session import BuildSession, OUT_OF_FUNDS_COPY, registry
+from .settings import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
-
-MAX_INPUT_CHARS = 40_000
 
 
 class CreateBuildBody(BaseModel):
@@ -26,24 +25,65 @@ class QueryBody(BaseModel):
     method: str = Field("collapsed_tree", pattern="^(collapsed_tree|tree_traversal)$")
 
 
+def _client_ip(request: Request) -> str:
+    # Trust X-Forwarded-For if Render/Vercel is fronting us, else the socket.
+    fwd = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    if fwd:
+        return fwd
+    return request.client.host if request.client else "unknown"
+
+
+def _cap_exceeded_response(exc: cost_tracker.CapExceeded) -> HTTPException:
+    if exc.reason == "mongo_down":
+        return HTTPException(
+            status_code=503,
+            detail={
+                "kind": "mongo_down",
+                "message": "Spend tracker offline — service temporarily unavailable.",
+            },
+        )
+    if exc.reason == "site_cap":
+        return HTTPException(
+            status_code=429,
+            detail={
+                "kind": "site_cap",
+                "message": "Daily site-wide AI budget reached. Please come back tomorrow.",
+                "used_usd": round(exc.used_usd, 4),
+                "cap_usd": exc.cap_usd,
+                "resets_at": exc.resets_at,
+            },
+        )
+    return HTTPException(
+        status_code=429,
+        detail={
+            "kind": "ip_cap",
+            "message": "You've hit your personal daily limit. The cap resets at midnight UTC.",
+            "used_usd": round(exc.used_usd, 4),
+            "cap_usd": exc.cap_usd,
+            "resets_at": exc.resets_at,
+        },
+    )
+
+
 @router.post("/builds")
 async def create_build(body: CreateBuildBody, request: Request) -> Dict[str, Any]:
-    if len(body.text) > MAX_INPUT_CHARS:
+    settings = get_settings()
+    if len(body.text) > settings.max_input_chars:
         raise HTTPException(
             status_code=413,
-            detail=f"Input exceeds {MAX_INPUT_CHARS} characters.",
+            detail={
+                "kind": "too_large",
+                "message": f"Input exceeds {settings.max_input_chars:,} characters.",
+            },
         )
 
-    ip = request.client.host if request.client else "unknown"
+    ip = _client_ip(request)
     try:
-        quota = await db.check_and_increment_quota(ip)
-    except db.QuotaExceeded as exc:
-        raise HTTPException(
-            status_code=429,
-            detail={"message": "Daily build limit reached.", "remaining": 0},
-        ) from exc
+        await cost_tracker.assert_under_cap(ip)
+    except cost_tracker.CapExceeded as exc:
+        raise _cap_exceeded_response(exc) from exc
 
-    session = registry.create(body.text)
+    session = registry.create(body.text, ip=ip)
     await db.save_build(
         session.id, text=body.text, status="pending", tree_json=None, ip=ip
     )
@@ -59,7 +99,7 @@ async def create_build(body: CreateBuildBody, request: Request) -> Dict[str, Any
         )
 
     asyncio.create_task(run_and_persist())
-    return {"build_id": session.id, "quota": quota}
+    return {"build_id": session.id}
 
 
 @router.get("/builds/{build_id}")
@@ -71,6 +111,7 @@ async def get_build(build_id: str) -> Dict[str, Any]:
             "status": session.status,
             "tree": session.tree_json,
             "error": session.error,
+            "error_kind": session.error_kind,
         }
     doc = await db.load_build(build_id)
     if doc is None:
@@ -80,6 +121,7 @@ async def get_build(build_id: str) -> Dict[str, Any]:
         "status": doc.get("status"),
         "tree": doc.get("tree_json"),
         "error": None,
+        "error_kind": None,
     }
 
 
@@ -99,30 +141,46 @@ async def stream_build(build_id: str, request: Request) -> EventSourceResponse:
             if event.stage in ("done", "error"):
                 return
 
-    # sse-starlette emits its own comment-style keep-alive every `ping` seconds.
     return EventSourceResponse(gen(), ping=15)
 
 
 @router.post("/builds/{build_id}/query")
-async def query_build(build_id: str, body: QueryBody) -> Dict[str, Any]:
+async def query_build(build_id: str, body: QueryBody, request: Request) -> Dict[str, Any]:
     session = _require(build_id)
-    if session.status != "done" or session.tree is None:
-        raise HTTPException(status_code=409, detail="Build not complete.")
+    # Allow query against a partially-built tree (out-of-funds mid-build leaves
+    # a usable structure). Only refuse when there's literally no tree to walk.
+    if session.tree is None:
+        raise HTTPException(status_code=409, detail="Build not ready.")
+
+    ip = _client_ip(request)
+    try:
+        await cost_tracker.assert_under_cap(ip)
+    except cost_tracker.CapExceeded as exc:
+        raise _cap_exceeded_response(exc) from exc
 
     from raptor import TreeRetriever
+    from raptor.tree_retriever import TreeRetrieverConfig
 
     collapse = body.method == "collapsed_tree"
-    retriever = TreeRetriever(session_retriever_config(session), session.tree)
-    context, layer_info = await asyncio.to_thread(
-        retriever.retrieve,
-        body.query,
-        None,
-        None,
-        10,
-        3500,
-        collapse,
-        True,
-    )
+    retriever = TreeRetriever(TreeRetrieverConfig(), session.tree)
+    try:
+        context, layer_info = await asyncio.to_thread(
+            retriever.retrieve,
+            body.query,
+            None,
+            None,
+            10,
+            3500,
+            collapse,
+            True,
+        )
+    except Exception as exc:
+        if cost_tracker.is_insufficient_quota_error(exc):
+            raise HTTPException(
+                status_code=503,
+                detail={"kind": "out_of_funds", "message": OUT_OF_FUNDS_COPY},
+            ) from exc
+        raise
     retrieved_ids = sorted({entry["node_index"] for entry in (layer_info or [])})
     return {
         "method": body.method,
@@ -130,12 +188,6 @@ async def query_build(build_id: str, body: QueryBody) -> Dict[str, Any]:
         "retrieved_node_ids": retrieved_ids,
         "layer_information": layer_info,
     }
-
-
-def session_retriever_config(session: BuildSession):
-    from raptor.tree_retriever import TreeRetrieverConfig
-
-    return TreeRetrieverConfig()
 
 
 def _require(build_id: str) -> BuildSession:

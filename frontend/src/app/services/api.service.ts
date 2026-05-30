@@ -17,15 +17,24 @@ export interface SerializedTree {
   nodes: SerializedNode[];
   edges: { parent: number; child: number }[];
 }
+export type ErrorKind = 'generic' | 'out_of_funds' | 'site_cap' | 'ip_cap' | 'too_large' | 'mongo_down';
+
 export interface BuildStatus {
   build_id: string;
   status: 'pending' | 'running' | 'done' | 'error';
   tree: SerializedTree | null;
   error: string | null;
+  error_kind: ErrorKind | null;
 }
 export interface CreateBuildResponse {
   build_id: string;
-  quota: { used: number; remaining: number };
+}
+export interface ApiErrorDetail {
+  kind: ErrorKind;
+  message: string;
+  used_usd?: number;
+  cap_usd?: number;
+  resets_at?: string;
 }
 export interface QueryResponse {
   method: string;

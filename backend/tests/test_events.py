@@ -26,7 +26,12 @@ def test_event_to_dict_is_json_safe():
     }
 
 
-def test_error_event():
+def test_error_event_default_kind():
     e = events.error("boom")
     assert e.stage == "error"
-    assert e.payload == {"message": "boom"}
+    assert e.payload == {"message": "boom", "kind": "generic"}
+
+
+def test_error_event_with_kind():
+    e = events.error("dry", kind="out_of_funds")
+    assert e.payload["kind"] == "out_of_funds"

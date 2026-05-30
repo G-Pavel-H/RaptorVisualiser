@@ -17,7 +17,14 @@ What works today:
 - Explore view re-renders the finished tree with click-to-inspect side panel.
 - Query mode hits `/api/builds/{id}/query` with collapsed-tree or tree-traversal
   retrieval and glows the retrieved nodes.
-- Per-IP daily quota (5 builds), 40 KB input cap, 24 h TTL via Mongo indexes.
+- **$ caps, not build counts.** Global $1/day and per-IP $0.10/day OpenAI spend
+  caps, refused at 90 % of each (so a $1 cap actually refuses at $0.90 to leave
+  headroom for in-flight requests). 20,000-char input cap. 24 h TTL on trees.
+- **gpt-4o-mini + text-embedding-3-small** for all OpenAI calls — RAPTOR's
+  default `gpt-3.5-turbo` + `text-embedding-ada-002` were 5–10× pricier.
+- **Out-of-funds UX.** If the OpenAI account itself runs dry mid-build, the
+  partial tree is preserved and the visitor sees a friendly "piggy bank ran
+  dry" message instead of a stack trace.
 
 ## Repo layout
 
@@ -102,6 +109,34 @@ set `window.RAPTOR_API_BASE` in `src/index.html` before bootstrap.
 ```bash
 npm test                  # karma + jasmine
 ```
+
+## Spend tracking & caps
+
+All OpenAI usage flows through `app/raptor_models.py` (subclasses of RAPTOR's
+`BaseEmbeddingModel` / `BaseSummarizationModel` / `BaseQAModel`). Every call's
+`usage.prompt_tokens` + `completion_tokens` is converted to USD via the price
+table in `app/cost_tracker.py` and `$inc`'d atomically into Mongo:
+
+```
+spend_log         { _id: "YYYY-MM-DD", cost_usd, prompt_tokens, ... }
+spend_log_ip      { _id: "YYYY-MM-DD::<ip>", cost_usd, ... }
+```
+
+Two env-tunable caps (`.env`):
+
+| | default | env var |
+|---|---|---|
+| Global daily | $1.00 | `DAILY_USD_CAP` |
+| Per-IP daily | $0.10 | `PER_IP_USD_CAP` |
+| Safety margin | 90 % | `SAFETY_MARGIN` |
+| Concurrency cap | 8 in-flight | `OPENAI_MAX_CONCURRENCY` |
+| Max input chars | 20,000 | `MAX_INPUT_CHARS` |
+
+**Price table drifts** when OpenAI changes prices — update the `PRICE_TABLE` dict
+in `app/cost_tracker.py` if you notice over- or under-billing.
+
+**Mongo is the source of truth.** If it's unreachable the API refuses all new
+builds with HTTP 503; better to be down briefly than blow through the budget.
 
 ## Known caveats
 
