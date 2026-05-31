@@ -24,13 +24,12 @@ def create_app() -> FastAPI:
         os.environ["OPENAI_API_KEY"] = settings.openai_api_key
     app = FastAPI(title="RAPTOR Live Visualizer", version="0.1.0")
 
-    # Allow the configured production origin AND any preview deploy under
-    # *.vercel.app — Vercel rotates hashed URLs every push, so an exact
-    # allowlist would break every redeploy.
+    # CORS only matters for the dev frontend on :4200 hitting :8000.
+    # In production both UI and API live on the same Render origin → no
+    # preflight ever fires for same-origin requests.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_origin],
-        allow_origin_regex=r"https://.*\.vercel\.app",
         allow_methods=["*"],
         allow_headers=["*"],
     )

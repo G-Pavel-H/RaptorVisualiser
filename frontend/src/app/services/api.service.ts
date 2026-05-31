@@ -2,15 +2,15 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
-// In `ng serve` dev mode → call the local FastAPI on :8000.
-// In production (Vercel) → call the deployed Render backend.
-// Override either by setting `window.RAPTOR_API_BASE` in index.html.
-const PROD_API = 'https://raptorvisualiser.onrender.com';
+// Single-Render deployment: in production the FastAPI server hosts the
+// compiled Angular bundle, so relative URLs target the same origin and CORS
+// is bypassed entirely. In `ng serve` dev mode we still need to point at
+// the local FastAPI on :8000.
 const isLocalDev =
   typeof window !== 'undefined' && window.location.hostname === 'localhost';
 const API_BASE =
   (window as any).RAPTOR_API_BASE ??
-  (isLocalDev ? 'http://localhost:8000' : PROD_API);
+  (isLocalDev ? 'http://localhost:8000' : '');
 
 export interface SerializedNode {
   id: number;
