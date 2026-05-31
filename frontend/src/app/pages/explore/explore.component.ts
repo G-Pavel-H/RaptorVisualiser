@@ -115,7 +115,16 @@ type Method = 'collapsed_tree' | 'tree_traversal';
       border-bottom: 1px solid var(--border);
       background: var(--bg-2);
     }
-    .query-input { flex: 1; }
+    .query-input { flex: 1; min-width: 0; }
+    /* Phones: stack query / method / retrieve vertically so nothing
+       overflows off the right edge. */
+    @media (max-width: 640px) {
+      .query-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .query-bar > * { width: 100%; }
+    }
     .tree-area { flex: 1; }
     .side { display: flex; flex-direction: column; gap: 16px; padding: 18px; overflow-y: auto; min-height: 0; }
     .new-build-btn {
