@@ -152,9 +152,8 @@ builds with HTTP 503; better to be down briefly than blow through the budget.
 
 ## Deployment
 
-Wired up in a later phase. Render for the FastAPI service, Vercel for Angular,
+Wired up in a later phase. Render for the FastAPI service and for Angular,
 MongoDB Atlas free tier. Secrets needed:
 
 - `OPENAI_API_KEY` (Render)
 - `MONGODB_URI` (Render)
-- `FRONTEND_ORIGIN` (Render, set to the Vercel URL)
