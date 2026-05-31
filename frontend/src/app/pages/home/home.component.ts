@@ -5,9 +5,7 @@ import { ApiErrorDetail, ApiService, ErrorKind } from '../../services/api.servic
 
 const SAMPLE = `Tigranes II, known as Tigranes the Great, ruled the Kingdom of Armenia from 95 to 55 BC and presided over the most expansive period in Armenian history. Born around 140 BC into the Artaxiad dynasty, he spent much of his youth as a hostage at the court of the Parthian Empire, a common diplomatic practice of the era. He secured his release and ascended the Armenian throne in 95 BC by ceding seventy valleys to Parthia, a price he would later reclaim many times over.
 
-Tigranes quickly set about consolidating power. He allied with Mithridates VI of Pontus, sealing the partnership by marrying Mithridates' daughter Cleopatra. With his eastern flank secured, he turned his armies outward. Within a decade he had absorbed the kingdom of Sophene, defeated the Parthians, and extended his rule over Media, Atropatene, Gordyene, Adiabene, Osroene, and large parts of Syria and Phoenicia. At its height, his empire stretched from the Caspian Sea to the Mediterranean, and he took the ancient Persian title "King of Kings."
-
-To rule this vast territory, Tigranes founded a new capital, Tigranocerta, in the south of his realm. He populated it by forcibly resettling Greek artisans, merchants, and scholars from the cities he had conquered, transforming it into a cosmopolitan centre of Hellenistic culture. The city housed theatres, parks, and a royal treasury, and reflected Tigranes' ambition to be seen not merely as an eastern monarch but as a successor to the Seleucid kings.`;
+Tigranes quickly set about consolidating power. He allied with Mithridates VI of Pontus, sealing the partnership by marrying Mithridates' daughter Cleopatra.`;
 
 @Component({
   selector: 'app-home',
