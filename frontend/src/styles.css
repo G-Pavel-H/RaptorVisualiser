@@ -23,14 +23,26 @@
   box-sizing: border-box;
 }
 
+/* Paint the dark base on every layer iOS Safari might fall back to:
+   <html> for the safe-area / rubber-band zones, <body> for the page itself.
+   The gradient lives on <body>; <html> stays solid so any region the
+   gradient doesn't cover still reads dark. */
+html {
+  background-color: #07090d;
+}
+body {
+  background-color: #07090d;
+  background-image: radial-gradient(circle at 20% 0%, #131b29 0%, #07090d 60%);
+}
+
 html, body {
   margin: 0;
   padding: 0;
-  height: 100%;
-  background: radial-gradient(circle at 20% 0%, #131b29 0%, var(--bg-0) 60%);
+  min-height: 100%;
   color: var(--text-0);
   font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
 }
 
 code, .mono {
