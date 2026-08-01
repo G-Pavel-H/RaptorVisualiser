@@ -70,4 +70,8 @@ export class ApiService {
   streamUrl(buildId: string): string {
     return `${API_BASE}/api/builds/${buildId}/stream`;
   }
+
+  deleteBuild(buildId: string): Observable<void> {
+    return this.http.delete<void>(`${API_BASE}/api/builds/${encodeURIComponent(buildId)}`);
+  }
 }

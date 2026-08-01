@@ -8,6 +8,7 @@ function makeHttp() {
   return {
     post: vi.fn().mockReturnValue(of({})),
     get: vi.fn().mockReturnValue(of({})),
+    delete: vi.fn().mockReturnValue(of(undefined)),
   };
 }
 
@@ -47,5 +48,34 @@ describe('ApiService', () => {
 
   it('maps distinct build ids to distinct stream urls', () => {
     expect(api.streamUrl('a')).not.toBe(api.streamUrl('b'));
+  });
+
+  describe('deleteBuild', () => {
+    it('DELETEs /api/builds/:id for a plain build id', () => {
+      api.deleteBuild('build-123');
+      expect(http.delete).toHaveBeenCalledWith(`${BASE}/api/builds/build-123`);
+    });
+
+    it('returns the observable from http.delete without subscribing', () => {
+      const fakeObservable = of(undefined);
+      http.delete.mockReturnValue(fakeObservable);
+      const result = api.deleteBuild('build-123');
+      // The returned value must be the observable itself (not subscribed)
+      expect(result).toBe(fakeObservable);
+      // http.delete is called exactly once (no internal subscription causes re-calls)
+      expect(http.delete).toHaveBeenCalledTimes(1);
+    });
+
+    it('URL-encodes a build id containing URL-special characters', () => {
+      api.deleteBuild('a b/c');
+      expect(http.delete).toHaveBeenCalledWith(`${BASE}/api/builds/a%20b%2Fc`);
+    });
+
+    it('DELETEs the correctly encoded URL, not the raw id string', () => {
+      api.deleteBuild('a b/c');
+      const calledUrl: string = http.delete.mock.calls[0][0];
+      expect(calledUrl).not.toContain('a b/c');
+      expect(calledUrl).toContain('a%20b%2Fc');
+    });
   });
 });
