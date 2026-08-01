@@ -1,0 +1,14 @@
+{
+  "name": "raptor-visualiser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RAPTOR tree visualiser — Angular frontend + Python (FastAPI) backend.",
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "test": "npm run test --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "start": "npm run start --workspace frontend"
+  }
+}

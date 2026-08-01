@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 // Single-Render deployment: in production the FastAPI server hosts the
@@ -53,7 +53,7 @@ export interface QueryResponse {
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private http = inject(HttpClient);
+  constructor(private http: HttpClient) {}
 
   createBuild(text: string): Observable<CreateBuildResponse> {
     return this.http.post<CreateBuildResponse>(`${API_BASE}/api/builds`, { text });
