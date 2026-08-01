@@ -6,7 +6,7 @@
 
 ## Summary
 
-Add a deleteBuild(buildId) method to the frontend ApiService that issues an HTTP DELETE request to the /api/builds/:id endpoint and returns the HttpClient observable, matching the existing CRUD method patterns.
+Add a deleteBuild(buildId) method to the frontend ApiService that issues an HTTP DELETE request to the /api/builds/:id endpoint and returns the HttpClient observable emitting a success acknowledgement, matching the existing CRUD method patterns.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ Each requirement is tagged with a confidence level (explicit / inferred / assump
 - **R2** `[explicit]` deleteBuild must issue an HTTP DELETE request to `${API_BASE}/api/builds/${buildId}`.
 - **R3** `[explicit]` deleteBuild must return the HttpClient observable directly, consistent with getBuild/query methods.
 - **R4** `[inferred]` The method must not subscribe to or otherwise consume the observable itself, leaving that to callers as with existing methods.
-- **R5** `[assumption]` The observable's generic response type should follow the convention used by the existing delete-adjacent or similar CRUD methods in the service.
+- **R5** `[explicit]` The observable should emit a success acknowledgement response for the DELETE operation.
 
 ## Acceptance Criteria
 
@@ -38,6 +38,12 @@ Each requirement is tagged with a confidence level (explicit / inferred / assump
 - **When** deleteBuild(id) is called
 - **Then** The id is placed into the URL path following the same interpolation approach as the other build methods
 
+### AC4
+
+- **Given** The backend DELETE responds successfully
+- **When** a caller subscribes to the returned observable
+- **Then** The observable emits a success acknowledgement response
+
 ## Non-Goals
 
 - No UI or button changes.
@@ -52,7 +58,6 @@ Each requirement is tagged with a confidence level (explicit / inferred / assump
 
 ## Assumptions
 
-- The response type/generic for the returned observable follows whatever convention the existing CRUD methods use, since the issue does not specify a response shape.
 - URL encoding of the build id mirrors the existing methods' approach rather than adding new encoding behavior.
 
 ## Open Questions
