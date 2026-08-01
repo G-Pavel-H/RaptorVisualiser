@@ -4,20 +4,20 @@
 
 ## Summary
 
-Add a single public deleteBuild(buildId: string) method to the frontend ApiService that returns this.http.delete<void>(`${API_BASE}/api/builds/${buildId}`), mirroring the existing getBuild pattern of building the URL inline and returning the HttpClient observable without subscribing. Add a corresponding spec that asserts http.delete is called with the correct URL.
+Add a single public deleteBuild(buildId: string) method to the frontend ApiService that returns this.http.delete<void>(`${API_BASE}/api/builds/${encodeURIComponent(buildId)}`), returning the HttpClient observable without subscribing. Per the maintainer's request, the build id is URL-encoded via encodeURIComponent for safe handling of special characters. Add a corresponding spec asserting http.delete is called with the correctly encoded URL.
 
 ## Approach
 
-The repo's ApiService methods all construct URLs inline via template literals (e.g. getBuild uses `${API_BASE}/api/builds/${buildId}`) and return the HttpClient observable directly. deleteBuild will follow this exact idiom: a one-liner returning this.http.delete<void>(...). Per R5 and existing conventions, the DELETE response body is treated as void (getBuild uses BuildStatus, query uses QueryResponse; a delete has no meaningful body), typed as Observable<void>. No URL-encoding helper is introduced because no existing method uses one — AC3 is satisfied by mirroring the existing inline template-literal construction. The spec's fake HttpClient (makeHttp) must expose a delete spy alongside get/post; I'll extend it if not already present. This is the smallest change satisfying the spec with no new abstractions.
+ApiService methods construct URLs inline via template literals and return the HttpClient observable directly (e.g. getBuild returns this.http.get<BuildStatus>(`${API_BASE}/api/builds/${buildId}`)). deleteBuild follows this idiom as a one-liner, with the one deliberate deviation the maintainer requested: the build id is wrapped in encodeURIComponent(buildId) so ids containing '/', spaces, or other special characters are safely encoded. Per R5 and existing conventions, a DELETE has no meaningful response body, so it is typed Observable<void> (getBuild uses BuildStatus, query uses QueryResponse). AC3 is now satisfied by explicit encoding rather than mirroring raw interpolation. The spec's fake HttpClient (makeHttp) must expose a delete spy alongside get/post; extend it if not already present. This remains the smallest change satisfying the spec plus the requested encoding, with no new abstractions.
 
 ## Affected Files
 
-- `frontend/src/app/services/api.service.ts` **(modify)** — Add public deleteBuild(buildId: string): Observable<void> method returning this.http.delete, following getBuild's inline-URL pattern.
-- `frontend/src/app/services/api.service.spec.ts` **(modify)** — Add test asserting deleteBuild issues DELETE to the correct URL; extend the makeHttp fake to include a delete spy if it is not already present.
+- `frontend/src/app/services/api.service.ts` **(modify)** — Add public deleteBuild(buildId: string): Observable<void> returning this.http.delete with encodeURIComponent(buildId) in the URL, following getBuild's inline-URL pattern.
+- `frontend/src/app/services/api.service.spec.ts` **(modify)** — Add tests asserting deleteBuild issues DELETE to the correctly encoded URL and returns the observable without subscribing; extend the makeHttp fake with a delete spy if not already present.
 
 ## Contracts
 
-- deleteBuild(buildId: string): Observable<void> on ApiService — issues HTTP DELETE to `${API_BASE}/api/builds/${buildId}` and returns the HttpClient observable without subscribing.
+- deleteBuild(buildId: string): Observable<void> on ApiService — issues HTTP DELETE to `${API_BASE}/api/builds/${encodeURIComponent(buildId)}` and returns the HttpClient observable without subscribing.
 
 ## Data Changes
 
@@ -25,7 +25,7 @@ _None._
 
 ## Test Strategy
 
-- AC1: In api.service.spec.ts add a unit test `deleteBuild DELETEs /api/builds/:id` that calls api.deleteBuild('build-123') and asserts http.delete was called with `${BASE}/api/builds/build-123`. Red before the method exists (delete spy uncalled / method missing), green after implementation.
-- AC2: The same test verifies the returned value is the observable produced by http.delete (assert deleteBuild returns http.delete's return value, and that no .subscribe is invoked), matching the getBuild/query non-subscribing pattern. This mirrors how existing tests only assert the http call, not a subscription.
-- AC3: Add a unit test using a build id with URL-special characters (e.g. 'a b/c') asserting the URL is constructed identically to how getBuild builds it — inline template literal without added encoding — so behavior is consistent with existing methods. Red before implementation, green after.
+- AC1: In api.service.spec.ts add a unit test `deleteBuild DELETEs /api/builds/:id` that calls api.deleteBuild('build-123') and asserts http.delete was called with `${BASE}/api/builds/build-123` (no special chars, so encoding is a no-op). Red before the method exists, green after implementation.
+- AC2: The same test verifies the returned value is the observable produced by http.delete (assert deleteBuild returns http.delete's return value and that no .subscribe is invoked), matching the getBuild/query non-subscribing pattern — consistent with existing tests that only assert the http call.
+- AC3: Add a unit test using a build id with URL-special characters (e.g. 'a b/c') asserting http.delete is called with `${BASE}/api/builds/${encodeURIComponent('a b/c')}` (i.e. 'a%20b%2Fc'), proving the id is URL-encoded. Red before implementation (or before encoding is added), green after.
 - Pre-req/support: Ensure the makeHttp fake in the spec exposes a `delete` mock (vi.fn) so http.delete can be asserted; if absent this is added as part of the spec change and verified by the tests above.
